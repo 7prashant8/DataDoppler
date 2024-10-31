@@ -4,56 +4,92 @@ from tensorflow.keras.preprocessing import image
 import numpy as np
 from PIL import Image
 
-# Load model
-model = load_model('model.h5')  # Ensure model.h5 is in the same directory
+# Load your trained model
+model = load_model('my_model.h5')  # Ensure the model file is named correctly and in the same directory
 
-# Function to preprocess image
-def preprocess_image(img):
-    img = img.resize((500, 500))
-    img = image.img_to_array(img)
-    img = np.expand_dims(img, axis=0) / 255.0  # Normalize image
-    return img
-
-# Streamlit page configuration
-st.set_page_config(page_title="Data Doppler", page_icon="🌀", layout="centered")
-
-# Sidebar Navigation
+# Set up the navigation menu
 st.sidebar.title("Data Doppler")
-page = st.sidebar.selectbox("Navigation", ["Home", "Dataset", "Contact"])
+page = st.sidebar.selectbox("Navigate", ["Home", "Dataset", "Contact"])
+
+# Define a function to preprocess the uploaded image
+def preprocess_image(uploaded_file):
+    img = Image.open(uploaded_file)
+    img = img.resize((224, 224))  # Resize to model input size
+    img_array = np.array(img) / 255.0  # Normalize to [0, 1] range
+    img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
+    return img_array
 
 # Home Page
 if page == "Home":
-    st.image("logo.png", width=100)  # Logo image
+    st.image("logo.png", width=300)  # Load a large logo image
     st.title("Data Doppler")
-    st.write("""
-        Welcome to Data Doppler! This web application is designed to classify images using a Convolutional Neural Network (CNN) model.
-        **Tech Stack:** Streamlit, TensorFlow, Python
-        **Technology:** CNN (Convolutional Neural Network)
-    """)
+    st.header("Exploring Rare Disease Image Classification")
+    st.write(
+        """
+        Welcome to **Data Doppler**, a machine learning-based tool for identifying and generating rare disease images using Convolutional Neural Networks (CNNs).
+        Developed by a team of students at GHRCE College, Nagpur, this project leverages state-of-the-art deep learning and image processing technology.
+        
+        **Tech Stack:**
+        - **TensorFlow and Keras** for deep learning model building.
+        - **Streamlit** for seamless web application integration.
+        - **Python** for efficient backend scripting and preprocessing.
+        
+        We invite you to explore this tool, which can classify disease images with high accuracy and generate augmented versions upon request!
+        """
+    )
 
 # Dataset Page
 elif page == "Dataset":
-    st.header("Upload and Classify an Image")
-    num_images = st.number_input("How many images to generate?", min_value=1, max_value=10, step=1)
+    st.title("Dataset")
+    st.write("Upload an image to classify and generate augmented samples:")
+
     uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+    num_images = st.number_input("How many similar images would you like to generate?", min_value=1, max_value=10, value=3, step=1)
 
     if uploaded_file is not None:
-        img = Image.open(uploaded_file)
-        st.image(img, caption="Uploaded Image", use_column_width=True)
-
         # Preprocess and predict
-        if st.button("Generate and Classify"):
-            processed_img = preprocess_image(img)
-            predictions = model.predict(processed_img)
-            class_index = np.argmax(predictions[0])
+        processed_img = preprocess_image(uploaded_file)
+        st.image(processed_img[0], caption="Uploaded Image", use_column_width=True)
 
-            # Display the generated images
-            st.write(f"Predicted Class: {class_index}")
-            st.write(f"Confidence: {np.max(predictions[0]) * 100:.2f}%")
+        # Model prediction
+        predictions = model.predict(processed_img)
+        predicted_class = np.argmax(predictions, axis=1)[0]
+        st.write(f"Predicted Class: {'Benign' if predicted_class == 0 else 'Malignant'}")
+
+        # Augmentations using ImageDataGenerator
+        from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+        data_gen = ImageDataGenerator(
+            rotation_range=40,
+            width_shift_range=0.2,
+            height_shift_range=0.2,
+            shear_range=0.2,
+            zoom_range=0.2,
+            horizontal_flip=True,
+            fill_mode='nearest'
+        )
+
+        st.write(f"Generating {num_images} augmented images:")
+        generated_images = []
+        for i in range(num_images):
+            img_iterator = data_gen.flow(processed_img, batch_size=1)
+            augmented_img = next(img_iterator)[0]
+            generated_images.append(augmented_img)
+
+        st.image(generated_images, width=100, caption=[f"Augmented {i+1}" for i in range(num_images)])
 
 # Contact Page
 elif page == "Contact":
-    st.header("Contact Us")
-    st.write("**Address:** GHRCE College, Nagpur")
-    st.write("**Mobile Number:** 7263049920")
-    st.write("**Team Members:** Prashant, Shreerang, Mahek, Yashaswi")
+    st.title("Contact Us")
+    st.write(
+        """
+        **Address**: GHRCE College, Nagpur  
+        **Phone**: 7263049920  
+        **Team Members**:  
+        - Prashant  
+        - Shreerang  
+        - Mahek  
+        - Yashaswi
+        """
+    )
+
